@@ -1,0 +1,565 @@
+```java
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+// AuctionItem class
+class AuctionItem {
+    int id;
+    String name;
+    String description;
+    double startingPrice;
+    boolean transferred;
+
+    AuctionItem(int id, String name, String description, double startingPrice) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.startingPrice = startingPrice;
+        this.transferred = false;
+    }
+
+    public String toString() {
+        return "Item ID: " + id + ", Name: " + name +
+               ", Description: " + description +
+               ", Starting Price: " + startingPrice;
+    }
+}
+
+// Seller class
+class Seller {
+    int id;
+    String name;
+
+    Seller(int id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+}
+
+// Bidder class
+class Bidder {
+    int id;
+    String name;
+
+    Bidder(int id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+}
+
+// Bid class
+class Bid {
+    int id;
+    Auction auction;
+    Bidder bidder;
+    double amount;
+    LocalDateTime time;
+
+    Bid(int id, Auction auction, Bidder bidder, double amount) {
+        this.id = id;
+        this.auction = auction;
+        this.bidder = bidder;
+        this.amount = amount;
+        this.time = LocalDateTime.now();
+    }
+}
+
+// Winner class
+class Winner {
+    Bidder bidder;
+    double finalPrice;
+    boolean confirmed;
+
+    Winner(Bidder bidder, double finalPrice) {
+        this.bidder = bidder;
+        this.finalPrice = finalPrice;
+        this.confirmed = false;
+    }
+}
+
+// Settlement class
+class Settlement {
+    int id;
+    Auction auction;
+    Winner winner;
+    boolean paid;
+    LocalDateTime settlementTime;
+
+    Settlement(int id, Auction auction, Winner winner) {
+        this.id = id;
+        this.auction = auction;
+        this.winner = winner;
+        this.paid = false;
+    }
+
+    void settlePayment() {
+        if (paid) {
+            System.out.println("Payment has already been settled.");
+            return;
+        }
+
+        if (!winner.confirmed) {
+            System.out.println("Winner must be confirmed before payment.");
+            return;
+        }
+
+        paid = true;
+        settlementTime = LocalDateTime.now();
+        auction.item.transferred = true;
+
+        System.out.println("\n========== SETTLEMENT RECEIPT ==========");
+        System.out.println("Settlement ID : " + id);
+        System.out.println("Auction ID    : " + auction.id);
+        System.out.println("Item          : " + auction.item.name);
+        System.out.println("Winner        : " + winner.bidder.name);
+        System.out.printf("Amount Paid   : %.2f%n", winner.finalPrice);
+        System.out.println("Payment Status: SUCCESS");
+        System.out.println("Item Transfer : COMPLETED");
+        System.out.println("Settlement Time: " +
+                settlementTime.format(DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss")));
+        System.out.println("========================================");
+    }
+}
+
+// Auction class
+class Auction {
+    int id;
+    AuctionItem item;
+    Seller seller;
+    LocalDateTime startTime;
+    LocalDateTime endTime;
+    List<Bid> bids;
+    boolean closed;
+    Winner winner;
+
+    Auction(int id, AuctionItem item, Seller seller,
+            LocalDateTime startTime, LocalDateTime endTime) {
+        this.id = id;
+        this.item = item;
+        this.seller = seller;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.bids = new ArrayList<>();
+        this.closed = false;
+        this.winner = null;
+    }
+
+    double getHighestBid() {
+        double highest = item.startingPrice;
+
+        for (Bid bid : bids) {
+            if (bid.amount > highest) {
+                highest = bid.amount;
+            }
+        }
+
+        return highest;
+    }
+
+    boolean placeBid(Bid bid) {
+        LocalDateTime now = LocalDateTime.now();
+
+        if (closed) {
+            System.out.println("Auction is already closed.");
+            return false;
+        }
+
+        if (now.isBefore(startTime) || !now.isBefore(endTime)) {
+            System.out.println("Bidding is allowed only during the auction window.");
+            return false;
+        }
+
+        if (bid.bidder == null || bid.auction != this) {
+            System.out.println("Invalid bidder or auction.");
+            return false;
+        }
+
+        if (bid.amount <= getHighestBid()) {
+            System.out.printf("Bid rejected! Bid must exceed %.2f%n", getHighestBid());
+            return false;
+        }
+
+        bids.add(bid);
+
+        System.out.println("Bid placed successfully!");
+        System.out.println("Bidder: " + bid.bidder.name);
+        System.out.printf("Your Bid: %.2f%n", bid.amount);
+        System.out.printf("Current Highest Bid: %.2f%n", getHighestBid());
+
+        return true;
+    }
+
+    void closeAuction() {
+        if (closed) {
+            System.out.println("Auction is already closed.");
+            return;
+        }
+
+        if (LocalDateTime.now().isBefore(endTime)) {
+            System.out.println("Auction cannot be closed before its scheduled end time.");
+            return;
+        }
+
+        closed = true;
+
+        System.out.println("\n========== AUCTION CLOSE SUMMARY ==========");
+        System.out.println("Auction ID: " + id);
+        System.out.println("Item: " + item.name);
+
+        if (bids.isEmpty()) {
+            System.out.println("No valid bids received.");
+            System.out.println("No winner declared.");
+        } else {
+            Bid highestBid = bids.get(0);
+
+            for (Bid bid : bids) {
+                if (bid.amount > highestBid.amount) {
+                    highestBid = bid;
+                }
+            }
+
+            winner = new Winner(highestBid.bidder, highestBid.amount);
+
+            System.out.println("Winner: " + winner.bidder.name);
+            System.out.printf("Final Price: %.2f%n", winner.finalPrice);
+            System.out.println("Winner Confirmation: PENDING");
+        }
+
+        System.out.println("Auction Status: CLOSED");
+        System.out.println("============================================");
+    }
+}
+
+// Main class
+public class OnlineAuctionSystem {
+    static Scanner sc = new Scanner(System.in);
+
+    static Map<Integer, Seller> sellers = new LinkedHashMap<>();
+    static Map<Integer, AuctionItem> items = new LinkedHashMap<>();
+    static Map<Integer, Bidder> bidders = new LinkedHashMap<>();
+    static Map<Integer, Auction> auctions = new LinkedHashMap<>();
+    static Map<Integer, Settlement> settlements = new LinkedHashMap<>();
+
+    static int sellerId = 1;
+    static int itemId = 1;
+    static int bidderId = 1;
+    static int auctionId = 1;
+    static int bidId = 1;
+    static int settlementId = 1;
+
+    static LocalDateTime readDateTime(String message) {
+        DateTimeFormatter formatter =
+                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+        while (true) {
+            System.out.print(message);
+
+            try {
+                return LocalDateTime.parse(sc.nextLine().trim(), formatter);
+            } catch (Exception e) {
+                System.out.println("Invalid format. Use yyyy-MM-dd HH:mm");
+            }
+        }
+    }
+
+    static int readInt(String message) {
+        while (true) {
+            System.out.print(message);
+
+            try {
+                return Integer.parseInt(sc.nextLine().trim());
+            } catch (NumberFormatException e) {
+                System.out.println("Enter a valid integer.");
+            }
+        }
+    }
+
+    static double readAmount(String message) {
+        while (true) {
+            System.out.print(message);
+
+            try {
+                double amount = Double.parseDouble(sc.nextLine().trim());
+
+                if (Double.isFinite(amount) && amount >= 0) {
+                    return amount;
+                }
+            } catch (NumberFormatException e) {
+                // Handle invalid input below.
+            }
+
+            System.out.println("Enter a valid non-negative amount.");
+        }
+    }
+
+    static void addSeller() {
+        System.out.print("Enter seller name: ");
+        String name = sc.nextLine().trim();
+
+        if (name.isEmpty()) {
+            System.out.println("Seller name cannot be empty.");
+            return;
+        }
+
+        Seller seller = new Seller(sellerId, name);
+        sellers.put(sellerId, seller);
+
+        System.out.println("Seller registered successfully. Seller ID: " + sellerId);
+        sellerId++;
+    }
+
+    static void addItem() {
+        if (sellers.isEmpty()) {
+            System.out.println("Add a seller before adding an item.");
+            return;
+        }
+
+        System.out.print("Enter item name: ");
+        String name = sc.nextLine().trim();
+
+        System.out.print("Enter item description: ");
+        String description = sc.nextLine().trim();
+
+        double price = readAmount("Enter starting price: ");
+
+        AuctionItem item = new AuctionItem(itemId, name, description, price);
+        items.put(itemId, item);
+
+        System.out.println("Item added successfully. Item ID: " + itemId);
+        itemId++;
+    }
+
+    static void createAuction() {
+        if (items.isEmpty() || sellers.isEmpty()) {
+            System.out.println("Add a seller and an item first.");
+            return;
+        }
+
+        System.out.println("Available Sellers:");
+        for (Seller s : sellers.values()) {
+            System.out.println(s.id + ". " + s.name);
+        }
+
+        int sid = readInt("Enter seller ID: ");
+        Seller seller = sellers.get(sid);
+
+        if (seller == null) {
+            System.out.println("Invalid seller ID.");
+            return;
+        }
+
+        System.out.println("Available Items:");
+        for (AuctionItem i : items.values()) {
+            System.out.println(i);
+        }
+
+        int iid = readInt("Enter item ID: ");
+        AuctionItem item = items.get(iid);
+
+        if (item == null || item.transferred) {
+            System.out.println("Invalid item or item already transferred.");
+            return;
+        }
+
+        for (Auction a : auctions.values()) {
+            if (a.item.id == item.id) {
+                System.out.println("This item already has an auction.");
+                return;
+            }
+        }
+
+        LocalDateTime start = readDateTime("Enter start time (yyyy-MM-dd HH:mm): ");
+        LocalDateTime end = readDateTime("Enter end time (yyyy-MM-dd HH:mm): ");
+
+        if (!end.isAfter(start)) {
+            System.out.println("End time must be after start time.");
+            return;
+        }
+
+        Auction auction = new Auction(auctionId, item, seller, start, end);
+        auctions.put(auctionId, auction);
+
+        System.out.println("Auction created successfully. Auction ID: " + auctionId);
+        auctionId++;
+    }
+
+    static void registerBidder() {
+        System.out.print("Enter bidder name: ");
+        String name = sc.nextLine().trim();
+
+        if (name.isEmpty()) {
+            System.out.println("Bidder name cannot be empty.");
+            return;
+        }
+
+        Bidder bidder = new Bidder(bidderId, name);
+        bidders.put(bidderId, bidder);
+
+        System.out.println("Bidder registered successfully. Bidder ID: " + bidderId);
+        bidderId++;
+    }
+
+    static void placeBid() {
+        if (auctions.isEmpty() || bidders.isEmpty()) {
+            System.out.println("Create an auction and register a bidder first.");
+            return;
+        }
+
+        displayAuctions();
+
+        int aid = readInt("Enter auction ID: ");
+        Auction auction = auctions.get(aid);
+
+        if (auction == null) {
+            System.out.println("Invalid auction ID.");
+            return;
+        }
+
+        System.out.println("Registered Bidders:");
+        for (Bidder b : bidders.values()) {
+            System.out.println(b.id + ". " + b.name);
+        }
+
+        int bidr = readInt("Enter bidder ID: ");
+        Bidder bidder = bidders.get(bidr);
+
+        if (bidder == null) {
+            System.out.println("Invalid bidder ID.");
+            return;
+        }
+
+        double amount = readAmount("Enter bid amount: ");
+
+        Bid bid = new Bid(bidId, auction, bidder, amount);
+
+        if (auction.placeBid(bid)) {
+            bidId++;
+        }
+    }
+
+    static void closeAuction() {
+        int id = readInt("Enter auction ID to close: ");
+        Auction auction = auctions.get(id);
+
+        if (auction == null) {
+            System.out.println("Auction not found.");
+            return;
+        }
+
+        auction.closeAuction();
+
+        if (auction.closed && auction.winner != null
+                && !settlements.containsKey(auction.id)) {
+            System.out.print("Confirm winner " + auction.winner.bidder.name
+                    + "? (yes/no): ");
+
+            String answer = sc.nextLine().trim();
+
+            if (answer.equalsIgnoreCase("yes")) {
+                auction.winner.confirmed = true;
+
+                Settlement settlement =
+                        new Settlement(settlementId, auction, auction.winner);
+
+                settlements.put(auction.id, settlement);
+                settlementId++;
+
+                System.out.println("Winner confirmed successfully.");
+                System.out.println("Use Settle Payment to complete payment.");
+            } else {
+                System.out.println("Winner confirmation is pending.");
+            }
+        }
+    }
+
+    static void settlePayment() {
+        int id = readInt("Enter auction ID for settlement: ");
+        Settlement settlement = settlements.get(id);
+
+        if (settlement == null) {
+            System.out.println("No confirmed winner or settlement found for this auction.");
+            return;
+        }
+
+        settlement.settlePayment();
+    }
+
+    static void displayAuctions() {
+        if (auctions.isEmpty()) {
+            System.out.println("No auctions available.");
+            return;
+        }
+
+        System.out.println("\n============== AUCTION LIST ==============");
+
+        for (Auction a : auctions.values()) {
+            System.out.println("Auction ID: " + a.id);
+            System.out.println("Item: " + a.item.name);
+            System.out.println("Seller: " + a.seller.name);
+            System.out.println("Start Time: " + a.startTime);
+            System.out.println("End Time: " + a.endTime);
+            System.out.println("Status: " + (a.closed ? "CLOSED" : "OPEN"));
+            System.out.printf("Current Highest Bid: %.2f%n", a.getHighestBid());
+
+            if (a.winner != null) {
+                System.out.println("Winner: " + a.winner.bidder.name);
+                System.out.println("Winner Confirmed: " + a.winner.confirmed);
+            }
+
+            System.out.println("Item Transferred: " + a.item.transferred);
+            System.out.println("------------------------------------------");
+        }
+    }
+
+    public static void main(String[] args) {
+        while (true) {
+            System.out.println("\n===== ONLINE AUCTION SYSTEM =====");
+            System.out.println("1. Add Seller");
+            System.out.println("2. Add Item");
+            System.out.println("3. Create Auction");
+            System.out.println("4. Register Bidder");
+            System.out.println("5. Place Bid");
+            System.out.println("6. Close Auction");
+            System.out.println("7. Settle Payment");
+            System.out.println("8. Display Auctions");
+            System.out.println("9. Exit");
+
+            int choice = readInt("Enter your choice: ");
+
+            switch (choice) {
+                case 1:
+                    addSeller();
+                    break;
+                case 2:
+                    addItem();
+                    break;
+                case 3:
+                    createAuction();
+                    break;
+                case 4:
+                    registerBidder();
+                    break;
+                case 5:
+                    placeBid();
+                    break;
+                case 6:
+                    closeAuction();
+                    break;
+                case 7:
+                    settlePayment();
+                    break;
+                case 8:
+                    displayAuctions();
+                    break;
+                case 9:
+                    System.out.println("Thank you for using the Online Auction System!");
+                    sc.close();
+                    return;
+                default:
+                    System.out.println("Invalid choice. Please try again.");
+            }
+        }
+    }
+}
+```
